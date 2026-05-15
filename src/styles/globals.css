@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "./button.scss";
+@import "./white-button.scss";
+
+@theme {
+
+  /* Custom Fonts */
+  --font-ibm-plex-sans : var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Custom Colors */
+  --color-blue: #010048; 
+  --color-blue-disable: #01004898;    
+  --color-text-black: #0D1520;      
+  --color-accent: #FFA726;        
+  --color-light-purple: #E7E6FF;       
+  --color-text-gray: #888888;    
+  --color-white: #FFFFFF;
+  --color-text-light-gray: #E9E9E9;  
+  --color-background-gray: #f5f5f5;
+  --color-border: #D9D9D9;
+  --color-text-red: #FF4C4C;
+  --color-list-background: #F2F2F2;
+  --color-yellow: #F7BB06;
+
+  /* Custom Breakpoints */
+
+  --breakpoint-2md: 54rem;
+  --breakpoint-1xl: 90rem;
+}
+
+
+body {
+  font-family: var(--font-ibm-plex-sans);
+  box-sizing: border-box;
+}
+
+.required-label:after {
+  content: " *";
+  color: var(--color-text-red);
+  opacity: 1;
+  margin-top: 1px;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  font-family: sans-serif;
+  /* font-size: 18px; */
+}
+
+.menu-item::before {
+  content: attr(data-count);
+  position: absolute;
+  top: 2px;
+  right: -13px;
+  transform: translate(50%, -50%);
+  background-color: var(--color-light-purple); 
+  color: var(--color-blue);            
+  /* font-size: 14px; */
+  font-weight: bold;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  line-height: 20px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px white; 
+  font-family: var(--font-ibm-plex-sans);
+}
+
+
+.ql-toolbar.ql-snow {
+  border-radius: 10px 10px 0 0;
+}
+.ql-container.ql-snow {
+  border-radius: 0 0 10px 10px;
+}
+
+.gradient-mask {
+  -webkit-mask-image: url("/assets/backgroundSlider/blur.png");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: cover;
+  -webkit-mask-position: center;
+  mask-image: url("/assets/backgroundSlider/blur.png");
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+  mask-position: center;
+}
+
+.gradient-overlay {
+  position: absolute;
+  inset: 0; 
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0,0.7) 100%
+  );
+  pointer-events: none; 
+}
+
+.about-us-gradient-overlay {
+  position: absolute;
+  min-height: 600px;
+  inset: 0; 
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0,0.6) 100%
+  );
+  pointer-events: none; 
+}
+
+.app-background {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+
+  background-image: url("/assets/app/background.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.app-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7); /* adjust opacity here */
+  z-index: 1;
+}
+.property-slider .slick-slider,
+.property-slider .slick-list,
+.property-slider .slick-track,
+.property-slider .slick-slide > div {
+  height: 100%;
+}
+
+/* Hide scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE & Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+.number-count > span {
+  font-size: 24px;
+  color: white;
+  font-weight: 500;
+}
+
+.custom-mobile-input .MuiInputBase-root {
+  height: 40px !important;
+}
+
+
+/* Equal height slick cards */
+.feature-property .slick-track {
+  display: flex !important;
+  align-items: stretch;
+}
+
+.feature-property .slick-slide {
+  height: auto !important;
+  max-width: 344px !important;
+  width: 344px !important;
+}
+
+.feature-property .slick-slide > div {
+  height: 100%;
+  max-width: 344px !important;
+  width: 344px !important;
+}
+
+@media (max-width: 1279px) {
+  .feature-property .slick-slide,
+  .feature-property .slick-slide > div {
+    max-width: 344px !important;
+    width: 344px !important;
+  }
+}
+
+/* <= 1023px (slidesToShow: 2) */
+@media (max-width: 1023px) {
+  .feature-property .slick-slide,
+  .feature-property .slick-slide > div {
+    max-width: 344px !important;
+    width: 344px !important;
+  }
+}
+
+/* <= 639px (slidesToShow: 1) */
+@media (max-width: 639px) {
+  .feature-property .slick-slide,
+  .feature-property .slick-slide > div {
+    max-width: 100% !important;
+  }
+}

@@ -1,0 +1,43 @@
+.animated-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.6s ease;
+  background-color: var(--color-blue);
+  border-radius: 50px;
+  color: white;
+}
+
+.animated-button:hover {
+  background-color: #ffffffc8;
+  color: white
+}
+
+.animated-button::before {
+  position: absolute;
+  content: '';
+  height: 200%;
+  width: 100%;
+  border-radius: 50% 50% 0 0;
+  left: 0;
+  top: 100%;
+  background-color: var(--color-blue);
+  transition: all 0.8s ease;
+  color: white
+}
+
+.animated-button:hover::before {
+ top: -60%;
+}
+
+.animated-button:disabled,
+.animated-button[disabled] {
+  background-color: var(--color-blue-disable);
+  color: white;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.animated-button:disabled::before,
+.animated-button[disabled]::before {
+  display: none;
+}
