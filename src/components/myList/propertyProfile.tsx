@@ -19,6 +19,7 @@ import DeactivateProperty from "./deactivateProperty";
 import { toast } from "react-toastify";
 import moment from "moment";
 import VerifyPropertyLink from "../verify-property-info";
+import { CircleCheckBig } from "lucide-react";
 
 const BorderLinearProgress = styled(LinearProgress)(({ theme }) => ({
   height: 8,
@@ -33,17 +34,18 @@ const BorderLinearProgress = styled(LinearProgress)(({ theme }) => ({
 }));
 
 const PropertyView = ({ open, onClose, propertyId }) => {
-  const imageBaseUrl = process.env.NEXT_PUBLIC_AWS_URL
-  const dispatch = useDispatch()
+  const imageBaseUrl = process.env.NEXT_PUBLIC_AWS_URL;
+  const dispatch = useDispatch();
   const theme = useTheme();
-  const router = useRouter()
+  const router = useRouter();
   const fullScreen = useMediaQuery(theme.breakpoints.down("md"));
 
-  const [openVideoPreview, setOpenVideoPreview] = React.useState(false)
-  const [videoPreviewUrl, setVideoPreviewUrl] = React.useState(null)
-  const [openDeactivePopup, setOpenDeactivePopup] = React.useState(false)
-  const [oepnverifyPopup, setOpenVerifyPopup] = React.useState(false)
-  const [verifyLink, setVerifyLink] = React.useState(null)
+  const [openVideoPreview, setOpenVideoPreview] = React.useState(false);
+  const [videoPreviewUrl, setVideoPreviewUrl] = React.useState(null);
+  const [openDeactivePopup, setOpenDeactivePopup] = React.useState(false);
+  
+  const [openVerifyPopup, setOpenVerifyPopup] = React.useState(false);
+  const [verifyLink, setVerifyLink] = React.useState(null);
 
   const handleClose: DialogProps["onClose"] = (_, reason) => {
     if (reason === "backdropClick" || reason === "escapeKeyDown") return;
@@ -51,36 +53,36 @@ const PropertyView = ({ open, onClose, propertyId }) => {
   };
 
   const { data: propertyDetails } = useQuery({
-      queryKey: ["property-list", propertyId],
-      queryFn: () => {
-        return getPropertyDetailsApiHandler(propertyId)
-      },
-      select: (data: GetPropertyDetailsResponse & {
-        property?: GetPropertyDetailsResponse;
-        verificationStatus?: string | null;
-        comments?: string | null;
-      }) =>{
-        if (data?.property) {
-          return {
-            ...data.property,
-            verificationStatus: data?.verificationStatus ?? data?.property?.verificationStatus ?? null,
-            comments: data?.comments ?? data?.property?.comments ?? null,
-          } as GetPropertyDetailsResponse;
-        }
-        return data
-      },
-      enabled: !!propertyId,
-      staleTime: 0,
-      refetchOnMount: true   
-    });
+    queryKey: ["property-list", propertyId],
+    queryFn: () => {
+      return getPropertyDetailsApiHandler(propertyId);
+    },
+    select: (data: GetPropertyDetailsResponse & {
+      property?: GetPropertyDetailsResponse;
+      verificationStatus?: string | null;
+      comments?: string | null;
+    }) => {
+      if (data?.property) {
+        return {
+          ...data.property,
+          verificationStatus: data?.verificationStatus ?? data?.property?.verificationStatus ?? null,
+          comments: data?.comments ?? data?.property?.comments ?? null,
+        } as GetPropertyDetailsResponse;
+      }
+      return data;
+    },
+    enabled: !!propertyId,
+    staleTime: 0,
+    refetchOnMount: true   
+  });
 
-    const { mutate: handleRepost, isPending: repostLoader } = useMutation({
+  const { mutate: handleRepost, isPending: repostLoader } = useMutation({
     mutationFn: repostPropertyApiHandler,
     onSuccess: (response: RepostPropertyResponse) => {
-      toast.success(response?.message)
-      onClose(true)
+      toast.success(response?.message);
+      onClose(true);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (Array.isArray(error.message)) {
         error.message.map((item: string) => {
           toast.error(item);
@@ -94,10 +96,10 @@ const PropertyView = ({ open, onClose, propertyId }) => {
   const { mutate: handleVerifyProperty, isPending: verifyLoader } = useMutation({
     mutationFn: getVerifyPropertyLinkAPiHandler,
     onSuccess: (response: GetVerifyPropertyLinkResponse) => {
-      setVerifyLink(response?.verificationLink)
-      setOpenVerifyPopup(true)
+      setVerifyLink(response?.verificationLink);
+      setOpenVerifyPopup(true); // Modal toggled on API success
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (Array.isArray(error.message)) {
         error.message.map((item: string) => {
           toast.error(item);
@@ -108,126 +110,126 @@ const PropertyView = ({ open, onClose, propertyId }) => {
     },
   });
 
-    const handleOpenVideoPreview = (url) => {
-        setOpenVideoPreview(true)
-        setVideoPreviewUrl(url)
+  const handleOpenVideoPreview = (url) => {
+    setOpenVideoPreview(true);
+    setVideoPreviewUrl(url);
+  };
+
+  const handleClosePreview = () => {
+    setOpenVideoPreview(false);
+    setVideoPreviewUrl(null);
+  };
+
+  const handleEdit = () => {
+    router.push(`/post-property/${propertyDetails.id}`);
+  };
+
+  const handleUploadPhoto = () => {
+    dispatch(setActiveStep({ step: 4 }));
+    router.push(`/post-property/${propertyDetails.id}?redirectTo=true`);
+  };
+
+  const getStatusColor = (status) => {
+    return propertyStatusColor.find(item => item.status == status) ?? null;
+  };
+
+  const mediaPreviewItems = React.useMemo(() => {
+    type MediaPreviewItem = {
+      id: string;
+      type: "photo" | "video";
+      fileKey: string;
+      src: string;
+      view?: string;
+      isCoverImage?: boolean;
+    };
+
+    const photoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.photos)
+      ? propertyDetails.photos.map((item, index) => ({
+          id: `photo-${item.fileKey}-${index}`,
+          type: "photo",
+          fileKey: item.fileKey,
+          src: (item as { url?: string })?.url ?? (imageBaseUrl + item.fileKey),
+          view: item.view,
+          isCoverImage: item.isCoverImage,
+        }))
+      : [];
+
+    const videoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.videos)
+      ? propertyDetails.videos.filter((item) => item?.fileKey || item?.url).map((item, index) => ({
+          id: `video-${item.fileKey}-${index}`,
+          type: "video",
+          fileKey: item.fileKey ?? `video-${index}`,
+          src: item?.url ?? (imageBaseUrl + item.fileKey),
+        }))
+      : [];
+
+    return [...photoItems, ...videoItems];
+  }, [propertyDetails?.photos, propertyDetails?.videos, imageBaseUrl]);
+
+  const {
+    mainMediaItem,
+    sideMediaItems,
+    extraMediaCount,
+    viewAllTileIndex,
+    totalMediaCount,
+  } = React.useMemo(() => {
+    const photos = mediaPreviewItems.filter((item) => item.type === "photo");
+    const videos = mediaPreviewItems.filter((item) => item.type === "video");
+    const mainItem =
+      photos.find((item) => item.isCoverImage) ?? photos[0] ?? videos[0] ?? null;
+
+    const usedMediaIds = new Set<string>();
+    if (mainItem) {
+      usedMediaIds.add(mainItem.id);
     }
 
-    const handleClosePreview = () => {
-        setOpenVideoPreview(false)
-        setVideoPreviewUrl(null)
-    }
+    const remainingPhotos = photos.filter((item) => !usedMediaIds.has(item.id));
+    const remainingVideos = videos.filter((item) => !usedMediaIds.has(item.id));
 
-    const handleEdit = () => {
-        router.push(`/post-property/${propertyDetails.id}`)
-    }
+    const sideItems: typeof mediaPreviewItems = [];
 
-    const handleUploadPhoto = () => {
-      dispatch(setActiveStep({step: 4}))
-      router.push(`/post-property/${propertyDetails.id}?redirectTo=true`)
-    }
+    if (remainingVideos.length > 0) {
+      sideItems.push(...remainingPhotos.slice(0, 3));
+      sideItems.push(remainingVideos[0]);
 
-    const getStatusColor = (status) => {
-      return propertyStatusColor.find(item => item.status == status) ?? null
-    }
-
-    const mediaPreviewItems = React.useMemo(() => {
-      type MediaPreviewItem = {
-        id: string;
-        type: "photo" | "video";
-        fileKey: string;
-        src: string;
-        view?: string;
-        isCoverImage?: boolean;
-      };
-
-      const photoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.photos)
-        ? propertyDetails.photos.map((item, index) => ({
-            id: `photo-${item.fileKey}-${index}`,
-            type: "photo",
-            fileKey: item.fileKey,
-            src: (item as { url?: string })?.url ?? (imageBaseUrl + item.fileKey),
-            view: item.view,
-            isCoverImage: item.isCoverImage,
-          }))
-        : [];
-
-      const videoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.videos)
-        ? propertyDetails.videos.filter((item) => item?.fileKey || item?.url).map((item, index) => ({
-            id: `video-${item.fileKey}-${index}`,
-            type: "video",
-            fileKey: item.fileKey ?? `video-${index}`,
-            src: item?.url ?? (imageBaseUrl + item.fileKey),
-          }))
-        : [];
-
-      return [...photoItems, ...videoItems];
-    }, [propertyDetails?.photos, propertyDetails?.videos, imageBaseUrl]);
-
-    const {
-      mainMediaItem,
-      sideMediaItems,
-      extraMediaCount,
-      viewAllTileIndex,
-      totalMediaCount,
-    } = React.useMemo(() => {
-      const photos = mediaPreviewItems.filter((item) => item.type === "photo");
-      const videos = mediaPreviewItems.filter((item) => item.type === "video");
-      const mainItem =
-        photos.find((item) => item.isCoverImage) ?? photos[0] ?? videos[0] ?? null;
-
-      const usedMediaIds = new Set<string>();
-      if (mainItem) {
-        usedMediaIds.add(mainItem.id);
+      if (sideItems.length < 4) {
+        sideItems.push(
+          ...remainingPhotos.slice(3, 3 + (4 - sideItems.length))
+        );
       }
 
-      const remainingPhotos = photos.filter((item) => !usedMediaIds.has(item.id));
-      const remainingVideos = videos.filter((item) => !usedMediaIds.has(item.id));
-
-      const sideItems: typeof mediaPreviewItems = [];
-
-      if (remainingVideos.length > 0) {
-        sideItems.push(...remainingPhotos.slice(0, 3));
-        sideItems.push(remainingVideos[0]);
-
-        if (sideItems.length < 4) {
-          sideItems.push(
-            ...remainingPhotos.slice(3, 3 + (4 - sideItems.length))
-          );
-        }
-
-        if (sideItems.length < 4) {
-          sideItems.push(
-            ...remainingVideos.slice(1, 1 + (4 - sideItems.length))
-          );
-        }
-      } else {
-        sideItems.push(...remainingPhotos.slice(0, 4));
+      if (sideItems.length < 4) {
+        sideItems.push(
+          ...remainingVideos.slice(1, 1 + (4 - sideItems.length))
+        );
       }
+    } else {
+      sideItems.push(...remainingPhotos.slice(0, 4));
+    }
 
-      const normalizedSideItems = sideItems.slice(0, 4);
-      normalizedSideItems.forEach((item) => usedMediaIds.add(item.id));
+    const normalizedSideItems = sideItems.slice(0, 4);
+    normalizedSideItems.forEach((item) => usedMediaIds.add(item.id));
 
-      const totalCount = mediaPreviewItems.length;
-      const remainingCount = Math.max(totalCount - usedMediaIds.size, 0);
-      const hasBottomRightVideo =
-        normalizedSideItems.length === 4 &&
-        normalizedSideItems[3]?.type === "video";
-      const allTileIndex =
-        normalizedSideItems.length === 0
-          ? -1
-          : hasBottomRightVideo
-          ? 2
-          : normalizedSideItems.length - 1;
+    const totalCount = mediaPreviewItems.length;
+    const remainingCount = Math.max(totalCount - usedMediaIds.size, 0);
+    const hasBottomRightVideo =
+      normalizedSideItems.length === 4 &&
+      normalizedSideItems[3]?.type === "video";
+    const allTileIndex =
+      normalizedSideItems.length === 0
+        ? -1
+        : hasBottomRightVideo
+        ? 2
+        : normalizedSideItems.length - 1;
 
-      return {
-        mainMediaItem: mainItem,
-        sideMediaItems: normalizedSideItems,
-        extraMediaCount: remainingCount,
-        viewAllTileIndex: allTileIndex,
-        totalMediaCount: totalCount,
-      };
-    }, [mediaPreviewItems]);
+    return {
+      mainMediaItem: mainItem,
+      sideMediaItems: normalizedSideItems,
+      extraMediaCount: remainingCount,
+      viewAllTileIndex: allTileIndex,
+      totalMediaCount: totalCount,
+    };
+  }, [mediaPreviewItems]);
 
   return (
     <Dialog
@@ -269,26 +271,25 @@ const PropertyView = ({ open, onClose, propertyId }) => {
           </div>
           <div className="flex flex-1 felx-start w-full 2md:w-[40%] flex-col gap-[2px]">
             <div className="flex justify-between">
-            <p className="text-xs lg:text-sm text-text-gray">
-              Listing Score
-            </p>
-            <p className="text-xs lg:text-sm text-text-black">{propertyDetails?.progressPercentage}%</p>
+              <p className="text-xs lg:text-sm text-text-gray">Listing Score</p>
+              <p className="text-xs lg:text-sm text-text-black">{propertyDetails?.progressPercentage}%</p>
             </div>
             <BorderLinearProgress variant="determinate" value={propertyDetails?.progressPercentage} />
           </div>
           {propertyDetails?.status != 'deactivated' && <button onClick={() => {
-            setOpenDeactivePopup(true)
+            setOpenDeactivePopup(true);
           }} className="cursor-pointer bg-[#F32B2B1A] text-sm text-[#F32B2B] flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#F32B2B1A] hover:border-[#F32B2B]">
-            <img src="/assets/deactivate-eye.svg" className="w-4 h-4"></img> Deactivate
+            <img src="/assets/deactivate-eye.svg" className="w-4 h-4" alt="deactivate"></img> Deactivate
           </button>}
           {
             propertyDetails?.status == 'deactivated' && <button onClick={() => {
-            handleRepost({propertyId: propertyId})
-          }} disabled={repostLoader} className="cursor-pointer bg-[#5e23dc] text-sm text-white flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#5e23dc]">
-            <img src="/assets/repost.svg" className="w-4 h-4"></img> Repost
-          </button>}
-          
+              handleRepost({ propertyId: propertyId });
+            }} disabled={repostLoader} className="cursor-pointer bg-[#5e23dc] text-sm text-white flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#5e23dc]">
+              <img src="/assets/repost.svg" className="w-4 h-4" alt="repost"></img> Repost
+            </button>
+          }
         </div>
+        
         <div className="flex flex-col 2md:flex-row justify-between items-start 2md:items-center gap-3">
           <div className="flex flex-col gap-1">
             <p className="font-semibold text-base text-blue">
@@ -296,19 +297,21 @@ const PropertyView = ({ open, onClose, propertyId }) => {
             </p>
           </div>
           <div className="flex gap-2 items-center">
-            <button onClick={handleEdit} className="cursor-pointer  bg-[#01004833] hover:bg-light-purple text-sm py-1.5 text-blue flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
-              <img src="/assets/edit-blue.svg" className="w-4 h-4"></img> Edit Listing
+            <button onClick={handleEdit} className="cursor-pointer bg-[#01004833] hover:bg-light-purple text-sm py-1.5 text-blue flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
+              <img src="/assets/edit-blue.svg" className="w-4 h-4" alt="edit"></img> Edit Listing
             </button>
             <button className="bg-[#01004833] text-sm text-blue flex items-center gap-2 px-4 py-1.5 rounded-[5px] font-medium">
-              <img src="/assets/share-blue.svg" className="w-4 h-4"></img> Share
+              <img src="/assets/share-blue.svg" className="w-4 h-4" alt="share"></img> Share
             </button>
             <button className="bg-[#01004833] text-sm text-blue flex items-center gap-2 px-4 py-2 rounded-[5px] font-medium">
-              <img src="/assets/more-blue.svg" className="w-4 h-4"></img>
+              <img src="/assets/more-blue.svg" className="w-4 h-4" alt="more"></img>
             </button>
           </div>
         </div>
-        <div className="flex flex-row flex-wrap gap-3">
-            <button style={{background: getStatusColor(propertyDetails?.status)?.color}} className="cursor-text text-sm text-white py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
+
+        <div className="flex flex-col lg:flex-row flex-wrap justify-between gap-2">
+          <div className="flex flex-row flex-wrap gap-3">
+            <button style={{ background: getStatusColor(propertyDetails?.status)?.color }} className="cursor-text text-sm text-white py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
               {getStatusColor(propertyDetails?.status)?.name}
             </button>
             {propertyDetails?.area ? <button className="cursor-text border border-border text-sm text-text-gray py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
@@ -317,14 +320,21 @@ const PropertyView = ({ open, onClose, propertyId }) => {
             {propertyDetails?.category && <button className="cursor-text border border-border text-sm text-text-gray py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
               {propertyDetails?.category}
             </button>}
-             {propertyDetails?.furnishingType && <button className=" cursor-text border border-border text-sm text-text-gray py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
+            {propertyDetails?.furnishingType && <button className="cursor-text border border-border text-sm text-text-gray py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
               {propertyDetails?.furnishingType}
             </button>}
+          </div>
 
-            {propertyDetails?.isVerified == 'verified' && <button className=" cursor-text border border-border text-sm text-text-gray py-1 flex items-center gap-2 px-4 py-1 rounded-[5px] font-medium">
-              {'Property Verified'}
-            </button>}
+          <button 
+            disabled={verifyLoader} 
+            onClick={() => handleVerifyProperty({ propertyId: propertyId })} 
+            className="cursor-pointer text-sm text-[#1B8836] flex mx-auto lg:mx-0 items-center gap-2 px-4 py-1 rounded-[5px] font-medium bg-[#33AB4133] hover:bg-[#33AB414d] transition-colors"
+          >
+            <CircleCheckBig height={20} width={20} /> 
+            <span>{propertyDetails?.verificationStatus === 'rejected' ? 'Re Verify' : 'Verify'}</span>
+          </button>
         </div>
+
         <div className="flex gap-3 justify-between">
           <div className="w-[80%] flex flex-col gap-3 flex-wrap">
             <p className="text-sm font-medium text-blue">Property Photos & Videos</p>
@@ -432,14 +442,22 @@ const PropertyView = ({ open, onClose, propertyId }) => {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-3">
-              {propertyDetails?.isVerified == 'unverified' && propertyDetails?.status == 'active' && <button disabled={verifyLoader} onClick={() => {
-                  handleVerifyProperty({propertyId: propertyId})
-                }} className="w-fit cursor-pointer bg-[#d5f3e8] text-sm text-[#008f4b] flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#d5f3e8] hover:border-[#008f4b]">
-                  <img src="/assets/verify.svg" className="w-4 h-4"></img> {propertyDetails?.verificationStatus == 'rejected' ? 'Re Verify' : 'Verify'}
-                </button>}
-          </div>
+
+          {/* Side action container for duplicate triggers can be cleaned up or safely synced */}
+            {/* <div className="flex flex-col gap-3">
+              {propertyDetails?.isVerified == 'unverified' && propertyDetails?.status == 'active' && (
+                <button 
+                  disabled={verifyLoader} 
+                  onClick={() => handleVerifyProperty({ propertyId: propertyId })} 
+                  className="w-fit cursor-pointer bg-[#d5f3e8] text-sm text-[#008f4b] flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#d5f3e8] hover:border-[#008f4b]"
+                >
+                  <img src="/assets/verify.svg" className="w-4 h-4" alt="verify icon"></img> 
+                  {propertyDetails?.verificationStatus == 'rejected' ? 'Re Verify' : 'Verify'}
+                </button>
+              )}
+            </div> */}
         </div>
+
         <div className="flex flex-wrap flex-row gap-10">
           <div>
             <p className="text-blue font-medium text-base">{propertyDetails?.price ? 'Price:' : 'Rent:'}</p>
@@ -466,6 +484,7 @@ const PropertyView = ({ open, onClose, propertyId }) => {
             <p className="text-text-gray text-base">{propertyDetails?.expiresAt ? moment(propertyDetails?.expiresAt).format('DD MMM YYYY') : '-'}</p>
           </div>
         </div>
+
         <div>
           {propertyDetails?.status == 'rejected' && <div className="flex flex-col">
             <p className="text-blue font-medium text-base">Reject Reason:</p>
@@ -479,22 +498,31 @@ const PropertyView = ({ open, onClose, propertyId }) => {
           </div>}
         </div>
       </DialogContent>
+
       <VideoPreviewDialog
         open={openVideoPreview}
         videoUrl={videoPreviewUrl}
         onClose={handleClosePreview}
-        />
+      />
 
-        {
-          openDeactivePopup && <DeactivateProperty open={openDeactivePopup} propertyId={propertyId} onClose={(isUpdate) => {
-            setOpenDeactivePopup(false)
-            onClose(isUpdate)
-          }}/>
-        }
-        <VerifyPropertyLink open={oepnverifyPopup} onClose={() => {
-          setOpenVerifyPopup(false)
-          setVerifyLink(null)
-        }} link={verifyLink}/>
+      {openDeactivePopup && (
+        <DeactivateProperty open={openDeactivePopup} propertyId={propertyId} onClose={(isUpdate) => {
+          setOpenDeactivePopup(false);
+          onClose(isUpdate);
+        }} />
+      )}
+
+      {/* FIXED: Dynamic fields synced properly with local design properties */}
+      <VerifyPropertyLink 
+        open={openVerifyPopup} 
+        onClose={() => {
+          setOpenVerifyPopup(false);
+          setVerifyLink(null);
+        }} 
+        link={verifyLink}
+        propertyId={propertyDetails?.id || propertyId}
+        propertyAddress={propertyDetails?.title || "Gurgaon Premium Asset Hub"}
+      />
     </Dialog>
   );
 };

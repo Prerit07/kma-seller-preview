@@ -45,42 +45,79 @@ export default function LoginOtpCard() {
     },
   });
 
+  // const { mutate: verifyOtp, isPending } = useMutation({
+  //   mutationFn: (payload: ValidateOtpPayload): Promise<ValidateOtpResponse> => validateOtpApiHandler(payload),
+  //   onSuccess: async (response) => {
+  //     await setAuthCookies(response.accessToken, response.refreshToken);
+  //     localStorage.setItem("user", JSON.stringify(response.user));
+  //     toast.success(response.message);
+  //     queryClient.clear();
+
+  //     // If profile is incomplete (user verified OTP but never filled details), send to create-account
+  //     if (response.requiredOtherDetails) {
+  //       localStorage.setItem("user", JSON.stringify(response.user));
+  //       router.replace("/create-account");
+  //       return;
+  //     }
+
+  //     const safeRedirect =
+  //       redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : null;
+  //     if (safeRedirect) {
+  //       router.replace(safeRedirect);
+  //       return;
+  //     }
+
+  //     // Role-based redirect
+  //     const userRole = response.user?.role;
+  //     if (userRole === "CHANNEL_PARTNER" && !response.kycCompleted) {
+  //       router.replace("/kyc");
+  //     } else if (userRole === "END_USER" || userRole === "USER") {
+  //       router.replace("/");
+  //     } else {
+  //       router.replace("/user-dashboard");
+  //     }
+  //   },
+  //   onError: (error: any) => {
+  //     setOtpError(error?.message ?? "Invalid OTP");
+  //   },
+  // });
+
   const { mutate: verifyOtp, isPending } = useMutation({
-    mutationFn: (payload: ValidateOtpPayload): Promise<ValidateOtpResponse> => validateOtpApiHandler(payload),
-    onSuccess: async (response) => {
-      await setAuthCookies(response.accessToken, response.refreshToken);
+  mutationFn: (payload: ValidateOtpPayload): Promise<ValidateOtpResponse> => validateOtpApiHandler(payload),
+  onSuccess: async (response) => {
+    await setAuthCookies(response.accessToken, response.refreshToken);
+    localStorage.setItem("user", JSON.stringify(response.user));
+    toast.success(response.message);
+    queryClient.clear();
+
+    const safeRedirect =
+      redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : null;
+    
+    if (safeRedirect) {
+      router.replace(safeRedirect);
+      return;
+    }
+
+    if (response.requiredOtherDetails) {
       localStorage.setItem("user", JSON.stringify(response.user));
-      toast.success(response.message);
-      queryClient.clear();
+      router.replace("/create-account");
+      return;
+    }
 
-      // If profile is incomplete (user verified OTP but never filled details), send to create-account
-      if (response.requiredOtherDetails) {
-        localStorage.setItem("user", JSON.stringify(response.user));
-        router.replace("/create-account");
-        return;
-      }
-
-      const safeRedirect =
-        redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : null;
-      if (safeRedirect) {
-        router.replace(safeRedirect);
-        return;
-      }
-
-      // Role-based redirect
-      const userRole = response.user?.role;
-      if (userRole === "CHANNEL_PARTNER" && !response.kycCompleted) {
-        router.replace("/kyc");
-      } else if (userRole === "END_USER" || userRole === "USER") {
-        router.replace("/");
-      } else {
-        router.replace("/user-dashboard");
-      }
-    },
-    onError: (error: any) => {
-      setOtpError(error?.message ?? "Invalid OTP");
-    },
-  });
+    // Role-based redirect
+    const userRole = response.user?.role;
+    if (userRole === "CHANNEL_PARTNER" && !response.kycCompleted) {
+      router.replace("/kyc");
+    } else if (userRole === "END_USER" || userRole === "USER") {
+      router.replace("/");
+    } else {
+      router.replace("/user-dashboard");
+    }
+  },
+  onError: (error: any) => {
+    setOtpError(error?.message ?? "Invalid OTP");
+  },
+});
 
   const handleOtpResend = () => {
     if (!isEnableOtpResend || !mobileNumber || isPending) {

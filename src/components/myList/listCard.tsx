@@ -119,7 +119,8 @@ export default function ListCard({data, handleManage}: {data: ListingItem, handl
         <hr className="border-border"></hr>
         <div className="flex justify-start gap-3 items-center">
           <p className="font-semibold text-blue text-lg lg:text-base">
-           &#8377; {data.price} / month
+           {/* &#8377; {data.price} / month */}
+          {data.listingType.name === "Sale" ? `₹ ${data.price}` : `₹ ${data.price} / month`}
             <span className="text-text-gray font-normal"> ({data.area} {AREA_UNIT_LIST.find(item => item.value == data.areaUnit)?.label}) </span>
           </p>
           <button className="bg-light-purple text-sm px-4 py-1 rounded-[5px] text-black">

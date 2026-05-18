@@ -146,7 +146,7 @@ export default function BankDetails({ isPopup = false, onClose }: { isPopup?: bo
   if (detailsLoader) return <FullscreenSpinner />;
 
   return (
-    <div className={isPopup ? "" : "w-[50%]"}>
+    <div className={isPopup ? "" : "w-[100%] lg:w-[50%]"}>
       <p className="required-label text-sm 1xl:text-base text-text-black py-2">Account number</p>
       <InputBase
         placeholder="Enter 9-18 digit account number"

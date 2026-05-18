@@ -82,8 +82,8 @@ export default function UserProfile() {
       {userProfile && (
         <div className="w-full bg-white rounded-xl flex flex-col justify-start items-start p-5 gap-3">
           <div className="flex w-full justify-between items-start gap-4">
-            <div className="flex-3 flex justify-between  gap-4">
-              <div className="flex  gap-4">
+            <div className="flex-3 flex justify-between  gap-2 lg:gap-4">
+              <div className="flex  gap-2 lg:gap-4">
                 <div className="w-fit rounded-full overflow-hidden">
                   <Image
                     src={userProfile.profileImage ? baseUrl + userProfile.profileImage : "/assets/profile.png"}
@@ -97,10 +97,10 @@ export default function UserProfile() {
                   <p className="text-text-black text-base font-semibold">
                     {userProfile.name}
                   </p>
-                  <p className="text-text-gray text-base">
+                  <p className="text-text-gray text-xs lg:text-base">
                     {userProfile.phone?.startsWith('+') ? userProfile.phone : `+91 ${userProfile.phone}`}
                   </p>
-                  <p className="text-text-gray text-base">
+                  <p className="text-text-gray text-xs lg:text-base">
                     {userProfile.email}
                   </p>
                 </div>

@@ -468,7 +468,7 @@ const handleUploadFileToS3 = async (files: File[], type: string) => {
           onClose={handleClosePreview}
         />
       </div>
-      <div className="flex justify-end w-full">
+      <div className="flex justify-center lg:justify-end w-full">
         <div className="flex flex-wrap justify-start flex-row gap-2 items-center mt-8">
           <button
             onClick={() => {

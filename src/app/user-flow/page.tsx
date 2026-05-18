@@ -6,6 +6,7 @@ import LoginOtpCard from "@/components/channelParterner/loginOtpCard";
 import MainLayout from "@/components/channelParterner/mainLayout";
 import SignupOtpCard from "@/components/channelParterner/signupOtpCard";
 import SignUp from "@/components/signUp/signUp";
+import { createURLSearchParam } from "@/lib/helper"; // Helper to reconstruct query safely
 
 interface UserFlowPageProps {
   searchParams: Promise<{
@@ -13,6 +14,7 @@ interface UserFlowPageProps {
     isOtp?: string;
     flow?: string;
     postProperty?: string;
+    redirect?: string; // ⚡ UPDATE 1: Interface me redirect parameter accept kiya
   }>;
 }
 
@@ -22,15 +24,19 @@ export default async function UserFlowPage({ searchParams }: UserFlowPageProps) 
   const isOtp = params?.isOtp === "true";
   const flow = params?.flow;
   const isPostProperty = params?.postProperty === "true";
+  const redirectTarget = params?.redirect; // Capture the verification redirect path safely
 
   const buyerUrl = process.env.NEXT_PUBLIC_BUYER_URL || "https://kma-website-frontend-kma-vercels-projects.vercel.app";
 
-  // End User flows don't belong on seller app — redirect to buyer
+  // Build temporary extra params to append during buyer redirects so verification flow doesn't break
+  const extraQuery = redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : "";
+
+  // End User flows don't belong on seller app — redirect to buyer (with redirect persistence)
   if (isOtp && flow === "enduser-login") {
-    redirect(`${buyerUrl}/user-flow?isLogin=true`);
+    redirect(`${buyerUrl}/user-flow?isLogin=true${extraQuery}`);
   }
   if (isOtp && flow === "enduser-signup") {
-    redirect(`${buyerUrl}/user-flow`);
+    redirect(`${buyerUrl}/user-flow?${extraQuery ? extraQuery.substring(1) : ""}`);
   }
 
   // Default to login view (Owner/CP). No End User signup on seller.
@@ -39,20 +45,17 @@ export default async function UserFlowPage({ searchParams }: UserFlowPageProps) 
     cardContent = <SignUp />;
   }
   if (isOtp && flow === "login") {
-    cardContent = <LoginOtpCard />;
+    cardContent = <LoginOtpCard />; // ⚡ Note: Make sure LoginOtpCard handles success using searchParams.get('redirect')
   }
   if (isOtp && flow === "signup") {
     cardContent = <SignupOtpCard />;
   }
 
-  const isLoginView = isLogin || (isOtp && flow === "login");
-  const isPostPropertyView = isPostProperty && !isOtp;
-
   return (
     <MainLayout>
       <ContentLayout
         cardContent={cardContent}
-        params={params}
+        params={params} // Passing params safely to layouts
       />
     </MainLayout>
   );
