@@ -64,7 +64,7 @@ export default function MobilePropertyVerifyLanding() {
       },
       (error) => {
         console.error("GPS Denied:", error);
-        alert("Kripya address track karne ke liye location access grant karein.");
+        alert("Please Allow Location Access");
       },
       { enableHighAccuracy: true }
     );
@@ -86,7 +86,7 @@ export default function MobilePropertyVerifyLanding() {
       router.push(`/verify-property/${propertyId}/permissions`);
     } catch (error) {
       console.error("Camera Denied:", error);
-      alert("On-site verification ke liye camera permissions active hona mandatory hai.");
+      alert("Camera Access permission is mandatory for verification");
     }
   };
 
