@@ -7,12 +7,13 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Dialog, { DialogProps } from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
-import { MoveLeft, Copy, Check } from "lucide-react"; // Icons for copying dynamic link
+import { MoveLeft, Copy, Check, ArrowRight } from "lucide-react"; // ⚡ ArrowRight icon for mobile CTA
+import { useRouter } from "next/navigation"; // ⚡ Router for redirection
 
 interface VerifyPropertyLinkProps {
   open: boolean;
   onClose: () => void;
-  propertyId: string; // UPDATED: Received dynamic property ID from parent view
+  propertyId: string; 
   propertyAddress?: string;
   onSetReminder?: (date: string) => void;
   onShareLink?: (mobileNumber: string) => void;
@@ -21,22 +22,20 @@ interface VerifyPropertyLinkProps {
 export default function VerifyPropertyLink({
   open,
   onClose,
-  propertyId, // Destructured dynamic propertyId
+  propertyId, 
   propertyAddress = "742 Evergreen Terrace, Springfield, IL 62704", 
   onSetReminder,
   onShareLink
 }: VerifyPropertyLinkProps) {
   const theme = useTheme();
+  const router = useRouter(); // ⚡ Router initialised safely
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  // States for forms and link status toggling
   const [visitDate, setVisitDate] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [isLinkSent, setIsLinkSent] = useState(false); 
-  const [copied, setCopied] = useState(false); // Manages clipboard feedback copy state
+  const [copied, setCopied] = useState(false); 
 
-  // 🌍 DYNAMIC LINK GENERATION ACCORDING TO YOUR SPEC
-  // Reads domain/localhost from env, falls back to localhost if not found
   const baseUrl = process.env.NEXT_PUBLIC_MOBILE_APP_URL || "http://localhost:3000";
   const dynamicVerificationLink = `${baseUrl}/user-flow?isLogin=true&redirect=/verify-property/${propertyId}`;
 
@@ -60,12 +59,11 @@ export default function VerifyPropertyLink({
     setIsLinkSent(true);
   };
 
-  // Clipboard utility handler to capture text copy string
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(dynamicVerificationLink);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000); // Reset state back to normal after 2s
+      setTimeout(() => setCopied(false), 2000); 
     } catch (err) {
       console.error("Failed to copy link: ", err);
     }
@@ -179,17 +177,35 @@ export default function VerifyPropertyLink({
             </button>
           </form>
 
-          {/* Central OR Divider Divider */}
+          {/* Central OR Divider */}
           <div className="flex md:flex-col items-center justify-center relative px-4">
             <div className="absolute z-10 bg-[#EEF2F6] border border-gray-200 text-[#010048] font-bold text-xs rounded-full w-15 h-15 flex items-center justify-center shadow-sm">
               OR
             </div>
           </div>
 
-          {/* Right Section: Conditional Form View OR Verification Link Sent View */}
+          {/* Right Section: ⚡ DYNAMIC MOBILE VIEW ENGINE CONDITION */}
           <div className="flex-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col justify-center min-h-[190px]">
-            {!isLinkSent ? (
-              /* State A: Original Form input view */
+            {isMobile ? (
+              /* State 1: Mobile View Screen CTA Mode */
+              <div className="w-full h-full flex flex-col justify-between text-center items-center gap-4 py-2">
+                <div className="space-y-3">
+                  <h5 className="text-base font-bold text-[#0D1520]">Verify Directly on this Mobile</h5>
+                  <p className="text-xs text-gray-400 font-medium leading-relaxed px-2">
+                    Since you are accessing from your smartphone, you can trigger the live AI camera verification interface directly.
+                  </p>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => router.push(`/verify-property/${propertyId}`)}
+                  className="w-full bg-[#010048] hover:bg-opacity-95 text-white font-semibold text-sm py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                >
+                  Continue Verification <ArrowRight width={16} height={16} />
+                </button>
+              </div>
+            ) : !isLinkSent ? (
+              /* State 2: Original Desktop View Form Input */
               <form onSubmit={handleShareSubmit} className="w-full h-full flex flex-col justify-between gap-4">
                 <div className="space-y-4">
                   <h5 className="text-sm md:text-base font-semibold text-center text-[#0D1520]">Share link with someone else</h5>
@@ -213,9 +229,8 @@ export default function VerifyPropertyLink({
                 </button>
               </form>
             ) : (
-              /* State B: Verification Link Sent Success layout card with dynamic tracking URL block */
+              /* State 3: Original Desktop View Link Sent Success View */
               <div className="w-full flex flex-col items-center justify-center text-center gap-3 py-2">
-                {/* Green Circle Check Mark */}
                 <div className="w-14 h-14 bg-[#33AB41] text-white rounded-full flex items-center justify-center shadow-md">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -226,7 +241,6 @@ export default function VerifyPropertyLink({
                   <h5 className="text-base font-bold text-[#000033]">Verification Link Sent</h5>
                   <p className="text-xs text-gray-500 font-medium">to +91 {mobileNumber}</p>
 
-                  {/* UPDATED: Displays the exact custom generated dynamic verification link on layout success */}
                   <div className="mt-3 flex items-center justify-between gap-2 bg-[#F1F5F9] border border-gray-200 rounded-lg p-2 max-w-full overflow-hidden">
                     <span className="text-[11px] text-gray-600 truncate text-left select-all font-mono block flex-1 pr-1">
                       {dynamicVerificationLink}

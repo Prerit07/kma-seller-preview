@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -10,14 +10,13 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   Loader2,
   X,
   ChevronRight,
 } from "lucide-react";
 
 const VERIFICATION_STEPS = [
-  { id: "entrance", label: "Property Front" },
+//   { id: "entrance", label: "Property Front" },
   { id: "living", label: "Living Room / Hall" },
   { id: "kitchen", label: "Kitchen Area" },
   { id: "bedroom", label: "Master Bedroom" },
@@ -29,9 +28,12 @@ export default function PropertyCameraCapturePage() {
   const propertyId = params?.id as string;
 
   const [openAccordionIdx, setOpenAccordionIdx] = useState<number | null>(0);
-  const [capturedImages, setCapturedImages] = useState<Record<string, string>>(
-    {},
-  );
+  
+  // Local UI previews state (Base64 ya Cloudinary URL dono hold karega)
+  const [capturedImages, setCapturedImages] = useState<Record<string, string>>({});
+  // Verified Cloudinary URLs mapping state
+  const [verifiedImages, setVerifiedImages] = useState<Record<string, string>>({});
+  
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -40,6 +42,26 @@ export default function PropertyCameraCapturePage() {
 
   const activeStepConfig =
     openAccordionIdx !== null ? VERIFICATION_STEPS[openAccordionIdx] : null;
+
+  // ⚡ 1. LOAD PERSISTED DATA ON INITIAL MOUNT (Page Refresh Setup)
+  useEffect(() => {
+    if (propertyId) {
+      const savedImages = localStorage.getItem(`kma_verified_${propertyId}`);
+      if (savedImages) {
+        const parsed = JSON.parse(savedImages);
+        setVerifiedImages(parsed);
+        setCapturedImages(parsed); // Previews me bhi vahi URLs daal diye taaki photo dikhti rahe
+
+        // Automatic agla incomplete accordion open karne ka logic
+        const completedCount = Object.keys(parsed).length;
+        if (completedCount < VERIFICATION_STEPS.length) {
+          setOpenAccordionIdx(completedCount);
+        } else {
+          setOpenAccordionIdx(null); // Saare done hain toh collapse rakho
+        }
+      }
+    }
+  }, [propertyId]);
 
   const startCamera = async () => {
     try {
@@ -61,9 +83,7 @@ export default function PropertyCameraCapturePage() {
       }, 100);
     } catch (error) {
       console.error("Fullscreen camera hardware trigger failed:", error);
-      alert(
-        "Camera module initialization failed. Please check app permissions.",
-      );
+      alert("Camera module initialization failed. Please check app permissions.");
       setIsCameraActive(false);
     }
   };
@@ -78,7 +98,7 @@ export default function PropertyCameraCapturePage() {
     const ctx = canvas.getContext("2d");
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg");
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.5);
 
       setCapturedImages((prev) => ({ ...prev, [stepId]: dataUrl }));
     }
@@ -100,32 +120,189 @@ export default function PropertyCameraCapturePage() {
       delete updated[stepId];
       return updated;
     });
+    
+    setVerifiedImages((prev) => {
+      const updated = { ...prev };
+      delete updated[stepId];
+      // Sync localStorage after deletion
+      localStorage.setItem(`kma_verified_${propertyId}`, JSON.stringify(updated));
+      return updated;
+    });
+    
     startCamera();
   };
 
-  const handleNextAccordionFlow = (currentIdx: number) => {
-    if (currentIdx < VERIFICATION_STEPS.length - 1) {
-      setOpenAccordionIdx(currentIdx + 1);
-    } else {
-      setOpenAccordionIdx(null);
-    }
-  };
+  // ⚡ 2. SAVE ON SUCCESS: AI Verify hote hi local storage me lock kardo
+  const handleNextAccordionFlow = async (currentIdx: number) => {
+    const stepConfig = VERIFICATION_STEPS[currentIdx];
+    const currentImageBase64 = capturedImages[stepConfig.id];
 
-  const handleFinalSubmit = async () => {
+    if (!currentImageBase64) {
+      alert("Please capture an image first!");
+      return;
+    }
+
+    // Agar yeh image pehle se verified Cloudinary URL hai (User refresh karke aya hai), toh direct skip karo
+    if (currentImageBase64.startsWith("http")) {
+      if (currentIdx < VERIFICATION_STEPS.length - 1) {
+        setOpenAccordionIdx(currentIdx + 1);
+      } else {
+        setOpenAccordionIdx(null);
+      }
+      return;
+    }
+
     setIsUploading(true);
     try {
-      console.log("Submitting capture object models:", capturedImages);
-      alert("Success! All photos recorded successfully.");
-      router.push(`/verify-property/${propertyId}/thank-you`);
+      const response = await fetch(`/api/verify-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: propertyId,
+          stepId: stepConfig.id,
+          stepLabel: stepConfig.label,
+          imageBase64: currentImageBase64
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.aiVerified) {
+        alert(`Success! ${result.message || "Image verified and saved."}`);
+        
+        if (result.s3Url) {
+          const updatedVerified = { ...verifiedImages, [stepConfig.id]: result.s3Url };
+          setVerifiedImages(updatedVerified);
+          setCapturedImages(prev => ({ ...prev, [stepConfig.id]: result.s3Url }));
+          
+          // ⚡ Local Storage Sync: Data refresh proof bana diya
+          localStorage.setItem(`kma_verified_${propertyId}`, JSON.stringify(updatedVerified));
+        }
+
+        if (currentIdx < VERIFICATION_STEPS.length - 1) {
+          setOpenAccordionIdx(currentIdx + 1);
+        } else {
+          setOpenAccordionIdx(null);
+        }
+      } else {
+        alert(`AI Verification Failed: ${result.message || "The captured image does not match this section. Please retake."}`);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("AI Node connection error:", err);
+      alert("Network or server connection issue during AI verification.");
     } finally {
       setIsUploading(false);
     }
   };
 
+  // Final submit hote hi localStorage flush kar denge taaki agle session ke liye fresh memory rahe
+//   const handleFinalSubmit = async () => {
+//     setIsUploading(true);
+//     try {
+//       const response = await fetch(`/api/property/save-verification`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({
+//           propertyId: propertyId,
+//           verifiedImages: Object.values(verifiedImages),
+//           status: "ACTIVE"
+//         })
+//       });
+
+//       const dbResult = await response.json();
+
+//       if (dbResult.success) {
+//         // ⚡ Fresh Token Clean-up: Submission ke baad purana cache clear
+//         localStorage.removeItem(`kma_verified_${propertyId}`);
+//         router.push(`/verify-property/${propertyId}/thank-you`);
+//       } else {
+//         alert(`Failed to lock verification: ${dbResult.message || "Database update failure."}`);
+//       }
+//     } catch (err) {
+//       console.error(err);
+//       alert("Pipeline context updates error.");
+//     } finally {
+//       setIsUploading(false);
+//     }
+//   };
+
+const getCookie = (name: string): string => {
+  if (typeof document === "undefined") return ""; 
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift() || "";
+  return "";
+};
+
+// ⚡ NEW HELPER: Prompt se liye huye token ko cookie me store karne ke liye
+const setCookie = (name: string, value: string, days = 1) => {
+  if (typeof document === "undefined") return;
+  const date = new Date();
+  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+  const expires = `; expires=${date.toUTCString()}`;
+  // path=/ lagane se poori website par ye cookie access ho payegi
+  document.cookie = `${name}=${value}${expires}; path=/; Secure; SameSite=Lax`;
+};
+
+const handleFinalSubmit = async () => {
+  setIsUploading(true);
+  try {
+    console.log("Submitting collected images...");
+    
+    // 1. Pehle check karega cookie me token hai ya nahi
+    let dynamicToken = getCookie("accessToken");
+
+    // 2. Agar cookie me nahi mila, toh prompt khulega
+    if (!dynamicToken) {
+      const fallbackToken = prompt(
+        "Dev Tunnel Cookie Blocked! Please paste your fresh accessToken here. (It will be saved in cookies for future automatically):"
+      );
+      
+      if (!fallbackToken) {
+        alert("Token required to complete verification.");
+        setIsUploading(false);
+        return;
+      }
+      
+      dynamicToken = fallbackToken.trim();
+      
+      // ⚡ MAGIC LINE: Token ko cookie me store kar diya 1 din ke liye
+      setCookie("accessToken", dynamicToken, 1);
+      console.log("Token successfully locked inside browser cookies!");
+    }
+
+    const response = await fetch(`/api/property/save-verification`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${dynamicToken}`
+      },
+      body: JSON.stringify({
+        propertyId: propertyId,
+        verifiedImages: Object.values(verifiedImages),
+        status: "ACTIVE"
+      })
+    });
+
+    const dbResult = await response.json();
+
+    if (dbResult.success) {
+      localStorage.removeItem(`kma_verified_${propertyId}`); //
+      router.push(`/verify-property/${propertyId}/thank-you`);
+    } else {
+      // Agar token real me expire ho chuka hoga backend side se, toh error handle hoga
+      alert(`Failed to lock verification: ${dbResult.message || JSON.stringify(dbResult)}`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Pipeline context updates error.");
+  } finally {
+    setIsUploading(false);
+  }
+};
+
   const isAllStepsCompleted = VERIFICATION_STEPS.every(
-    (step) => capturedImages[step.id] !== undefined,
+    (step) => verifiedImages[step.id] !== undefined
   );
 
   return (
@@ -166,7 +343,6 @@ export default function PropertyCameraCapturePage() {
             >
               <div className="w-full h-full bg-red-600 rounded-full border-2 border-white" />
             </button>
-            
           </div>
         </div>
       )}
@@ -192,7 +368,7 @@ export default function PropertyCameraCapturePage() {
 
         <div className="w-full space-y-3.5">
           {VERIFICATION_STEPS.map((step, idx) => {
-            const isCompleted = capturedImages[step.id] !== undefined;
+            const isCompleted = verifiedImages[step.id] !== undefined;
             const isOpen = openAccordionIdx === idx;
             const stepPreview = capturedImages[step.id];
 
@@ -256,7 +432,6 @@ export default function PropertyCameraCapturePage() {
 
                 {isOpen && (
                   <div className="p-4 bg-white space-y-4 animate-fadeIn">
-                    {/* Viewfinder Aspect preview block box */}
                     <div className="w-full aspect-[4/2] bg-[#A9A9DB]/10 border border-dashed rounded-xl relative overflow-hidden flex flex-col items-center justify-center shadow-inner">
                       {stepPreview ? (
                         <img
@@ -265,11 +440,7 @@ export default function PropertyCameraCapturePage() {
                           className="w-full h-full object-cover absolute inset-0"
                         />
                       ) : (
-                        <button
-                          type="button"
-                          onClick={startCamera}
-                          className="text-center space-y-2.5 p-4 flex flex-col items-center"
-                        >
+                        <div className="text-center space-y-2.5 p-4 flex flex-col items-center">
                           <button
                             type="button"
                             onClick={startCamera}
@@ -280,7 +451,7 @@ export default function PropertyCameraCapturePage() {
                           <p className="text-[11px] text-gray-400 font-medium">
                             Click here to start capturing property images
                           </p>
-                        </button>
+                        </div>
                       )}
                     </div>
 
@@ -289,7 +460,8 @@ export default function PropertyCameraCapturePage() {
                         <button
                           type="button"
                           onClick={() => handleRetake(step.id)}
-                          className="flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                          disabled={isUploading}
+                          className="flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all cursor-pointer disabled:opacity-50"
                         >
                           <RotateCcw className="w-3.5 h-3.5" /> Retake Photo
                         </button>
@@ -297,9 +469,16 @@ export default function PropertyCameraCapturePage() {
                         <button
                           type="button"
                           onClick={() => handleNextAccordionFlow(idx)}
-                          className="flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-white bg-[#010048] hover:bg-opacity-95 rounded-xl shadow-xs transition-all cursor-pointer"
+                          disabled={isUploading}
+                          className="flex items-center justify-center gap-1.5 py-3 text-xs font-bold text-white bg-[#010048] hover:bg-opacity-95 rounded-xl shadow-xs transition-all cursor-pointer disabled:bg-gray-400"
                         >
-                          Next <ArrowRight className="w-3.5 h-3.5" />
+                          {isUploading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : isCompleted ? (
+                            <>Skip Section <ArrowRight className="w-3.5 h-3.5" /></>
+                          ) : (
+                            <>Next <ArrowRight className="w-3.5 h-3.5" /></>
+                          )}
                         </button>
                       </div>
                     )}

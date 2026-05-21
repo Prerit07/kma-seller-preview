@@ -89,17 +89,24 @@ export default function ListCard({data, handleManage}: {data: ListingItem, handl
     >
       <div className="relative w-[260px] lg:h-full rounded-[5px] overflow-hidden property-slider">
         <Slider {...settings}>
-          {data?.photos?.map((img, index) => (
-            <div key={index} className="relative h-full w-full">
-              <Image
-                src={imgBaseUrl + img.fileKey}
-                alt="property image"
-                width={600}
-                height={400}
-                className="object-cover h-full"
-              />
-            </div>
-          ))}
+          {data?.photos?.map((img, index) => {
+            // ⚡ CLOUDINARY ABSOLUTE URL CHECK WITH SSR SAFETY
+            const isAbsoluteUrl = img.fileKey?.startsWith("http://") || img.fileKey?.startsWith("https://");
+            const finalImgSrc = isAbsoluteUrl ? img.fileKey : `${imgBaseUrl}${img.fileKey}`;
+
+            return (
+              <div key={index} className="relative h-full w-full">
+                <Image
+                  src={finalImgSrc}
+                  alt="property image"
+                  width={600}
+                  height={400}
+                  className="object-cover h-full"
+                  unoptimized={isAbsoluteUrl} // Cloudinary images are loaded directly without breaking bounds
+                />
+              </div>
+            );
+          })}
         </Slider>
         <div className="absolute top-[5px] right-[5px] px-3 py-1 text-xs font-bold text-white rounded-[5px]" style={{background: getStatusColor(data.status)?.color}}>
             <p>{getStatusColor(data.status)?.name}</p>

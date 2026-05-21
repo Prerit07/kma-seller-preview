@@ -97,7 +97,7 @@ const PropertyView = ({ open, onClose, propertyId }) => {
     mutationFn: getVerifyPropertyLinkAPiHandler,
     onSuccess: (response: GetVerifyPropertyLinkResponse) => {
       setVerifyLink(response?.verificationLink);
-      setOpenVerifyPopup(true); // Modal toggled on API success
+      setOpenVerifyPopup(true);
     },
     onError: (error: any) => {
       if (Array.isArray(error.message)) {
@@ -133,6 +133,7 @@ const PropertyView = ({ open, onClose, propertyId }) => {
     return propertyStatusColor.find(item => item.status == status) ?? null;
   };
 
+  // ⚡ COMPONENT CORRECTION WORKSPACE: Cloudinary url matching logic
   const mediaPreviewItems = React.useMemo(() => {
     type MediaPreviewItem = {
       id: string;
@@ -144,23 +145,34 @@ const PropertyView = ({ open, onClose, propertyId }) => {
     };
 
     const photoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.photos)
-      ? propertyDetails.photos.map((item, index) => ({
-          id: `photo-${item.fileKey}-${index}`,
-          type: "photo",
-          fileKey: item.fileKey,
-          src: (item as { url?: string })?.url ?? (imageBaseUrl + item.fileKey),
-          view: item.view,
-          isCoverImage: item.isCoverImage,
-        }))
+      ? propertyDetails.photos.map((item, index) => {
+          // Check matching pattern logic: Agar fileKey absolute Cloudinary URL hai, toh direct use karo
+          const isAbsoluteUrl = item.fileKey?.startsWith("http://") || item.fileKey?.startsWith("https://");
+          const finalSrc = isAbsoluteUrl ? item.fileKey : ((item as { url?: string })?.url ?? (imageBaseUrl + item.fileKey));
+
+          return {
+            id: `photo-${item.fileKey}-${index}`,
+            type: "photo",
+            fileKey: item.fileKey,
+            src: finalSrc,
+            view: item.view,
+            isCoverImage: item.isCoverImage,
+          };
+        })
       : [];
 
     const videoItems: MediaPreviewItem[] = Array.isArray(propertyDetails?.videos)
-      ? propertyDetails.videos.filter((item) => item?.fileKey || item?.url).map((item, index) => ({
-          id: `video-${item.fileKey}-${index}`,
-          type: "video",
-          fileKey: item.fileKey ?? `video-${index}`,
-          src: item?.url ?? (imageBaseUrl + item.fileKey),
-        }))
+      ? propertyDetails.videos.filter((item) => item?.fileKey || item?.url).map((item, index) => {
+          const isAbsoluteUrl = item.fileKey?.startsWith("http://") || item.fileKey?.startsWith("https://");
+          const finalSrc = isAbsoluteUrl ? item.fileKey : (item?.url ?? (imageBaseUrl + item.fileKey));
+
+          return {
+            id: `video-${item.fileKey}-${index}`,
+            type: "video",
+            fileKey: item.fileKey ?? `video-${index}`,
+            src: finalSrc,
+          };
+        })
       : [];
 
     return [...photoItems, ...videoItems];
@@ -325,14 +337,32 @@ const PropertyView = ({ open, onClose, propertyId }) => {
             </button>}
           </div>
 
-          <button 
+          {/* <button 
             disabled={verifyLoader} 
             onClick={() => handleVerifyProperty({ propertyId: propertyId })} 
             className="cursor-pointer text-sm text-[#1B8836] flex mx-auto lg:mx-0 items-center gap-2 px-4 py-1 rounded-[5px] font-medium bg-[#33AB4133] hover:bg-[#33AB414d] transition-colors"
           >
             <CircleCheckBig height={20} width={20} /> 
             <span>{propertyDetails?.verificationStatus === 'rejected' ? 'Re Verify' : 'Verify'}</span>
-          </button>
+          </button> */}
+          {propertyDetails?.isVerified === "verified" ? (
+  <button 
+    disabled={true}
+    className="cursor-not-allowed text-sm text-[#1B8836] flex mx-auto lg:mx-0 items-center gap-2 px-4 py-1.5 rounded-[5px] font-semibold bg-[#33AB411a] border border-[#33AB414d]"
+  >
+    <CircleCheckBig height={20} width={20} className="fill-[#1B8836] text-white" /> 
+    <span>Verified by AI</span>
+  </button>
+) : (
+  <button 
+    disabled={verifyLoader} 
+    onClick={() => handleVerifyProperty({ propertyId: propertyId })} 
+    className="cursor-pointer text-sm text-[#1B8836] flex mx-auto lg:mx-0 items-center gap-2 px-4 py-1.5 rounded-[5px] font-medium bg-[#33AB4133] hover:bg-[#33AB414d] transition-colors"
+  >
+    <CircleCheckBig height={20} width={20} /> 
+    <span>{propertyDetails?.verificationStatus === 'rejected' ? 'Re Verify' : 'Verify'}</span>
+  </button>
+)}
         </div>
 
         <div className="flex gap-3 justify-between">
@@ -353,6 +383,7 @@ const PropertyView = ({ open, onClose, propertyId }) => {
                         alt="property media"
                         fill
                         className="object-cover"
+                        unoptimized={mainMediaItem.src.startsWith("http")} // Next.js Image Optimization handles remote Cloudinary domains seamlessly
                       />
                     )}
                     {mainMediaItem.type === "video" ? (
@@ -396,6 +427,7 @@ const PropertyView = ({ open, onClose, propertyId }) => {
                         alt="property media"
                         fill
                         className="object-cover"
+                        unoptimized={item.src.startsWith("http")}
                       />
                     )}
 
@@ -442,20 +474,6 @@ const PropertyView = ({ open, onClose, propertyId }) => {
               </div>
             </div>
           </div>
-
-          {/* Side action container for duplicate triggers can be cleaned up or safely synced */}
-            {/* <div className="flex flex-col gap-3">
-              {propertyDetails?.isVerified == 'unverified' && propertyDetails?.status == 'active' && (
-                <button 
-                  disabled={verifyLoader} 
-                  onClick={() => handleVerifyProperty({ propertyId: propertyId })} 
-                  className="w-fit cursor-pointer bg-[#d5f3e8] text-sm text-[#008f4b] flex items-center gap-2 px-3 py-1.5 rounded-[5px] font-medium border border-[#d5f3e8] hover:border-[#008f4b]"
-                >
-                  <img src="/assets/verify.svg" className="w-4 h-4" alt="verify icon"></img> 
-                  {propertyDetails?.verificationStatus == 'rejected' ? 'Re Verify' : 'Verify'}
-                </button>
-              )}
-            </div> */}
         </div>
 
         <div className="flex flex-wrap flex-row gap-10">
@@ -512,7 +530,6 @@ const PropertyView = ({ open, onClose, propertyId }) => {
         }} />
       )}
 
-      {/* FIXED: Dynamic fields synced properly with local design properties */}
       <VerifyPropertyLink 
         open={openVerifyPopup} 
         onClose={() => {
