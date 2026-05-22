@@ -13,7 +13,7 @@ function calculateDistanceInMeters(
   lat2: number,
   lon2: number,
 ) {
-  const R = 6371e3; // Earth's radius in meters
+  const R = 6371e3;
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -39,15 +39,14 @@ export default function PropertyRadiusVerificationPage() {
   } | null>(null);
 
   // Verification Processing States
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [countdown, setCountdown] = useState(24); // Matches the '24' circle loader from image_cd5864.png
+  const [isVerifying, setIsVerifying] = useState<boolean | null>(null);
+  const [countdown, setCountdown] = useState(24); 
   const [verificationResult, setVerificationResult] = useState<
     "success" | "failed" | null
   >(null);
   const [computedDistance, setComputedDistance] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // ⚡ RESTORED NATIVE FETCH: Exact landing page ki tarah fetch query function
   useEffect(() => {
     if (!propertyId) return;
 
@@ -58,18 +57,22 @@ export default function PropertyRadiusVerificationPage() {
         );
         const data = await response.json();
 
+        console.log("================= API RAW RESPONSE =================");
+      console.log("Full Data Object:", data);
+      console.log("====================================================");
+
         if (data?.success && data?.property) {
           // Accessing latitude and longitude safely from standard object response
           const lat =
-            data.location?.latitude || data.property.society?.latitude;
+            data.property.latitude || data.location?.latitude || data.property.society?.latitude;
           const lng =
-            data.location?.longitude || data.property.society?.longitude;
+            data.property.longitude || data.location?.longitude || data.property.society?.longitude;
 
           if (lat && lng) {
             setTargetCoords({ lat: Number(lat), lng: Number(lng) });
           } else {
             // Fallback testing defaults if actual live coordinate attributes are missing
-            setTargetCoords({ lat: 28.4124, lng: 77.0425 });
+            alert("No coordinates found");
           }
         }
       } catch (error) {
@@ -91,6 +94,7 @@ export default function PropertyRadiusVerificationPage() {
 
     setIsVerifying(true);
     setVerificationResult(null);
+    setCountdown(24); // Reset loader countdown on re-scan
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -119,18 +123,19 @@ export default function PropertyRadiusVerificationPage() {
               clearInterval(timer);
               setIsVerifying(false);
 
-              // 🚨 STRICT 500M GEOMETRIC BOUNDARY CONSTRAINT
+              // 🚨 500M GEOMETRIC BOUNDARY CONSTRAINT (Bypass Fixed!)
               if (distanceInMeters <= 500) {
                 setVerificationResult("success");
-                // Redirect user automatically to next capture grid view upon successful parsing
+                // Successful verification allows forwarding to capture panel
                 setTimeout(() => {
                   router.push(`/verify-property/${propertyId}/capture`);
                 }, 1500);
               } else {
-                setVerificationResult("success");
-                setTimeout(() => {
-                  router.push(`/verify-property/${propertyId}/capture`);
-                }, 1500);
+                // Strict enforcement: Out of range results in failure view state
+                setVerificationResult("failed");
+                setErrorMessage(
+                  `Location mismatch detected. You are physically present far from the site boundary.`
+                );
               }
               return 0;
             }
@@ -143,7 +148,7 @@ export default function PropertyRadiusVerificationPage() {
         setIsVerifying(false);
         setVerificationResult("failed");
         setErrorMessage(
-          "Hardware location lookup failed. Please enable your location from your device settings",
+          "Hardware location lookup failed. Please enable your location from your device settings"
         );
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -160,7 +165,7 @@ export default function PropertyRadiusVerificationPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between font-sans antialiased">
       {/* Top Professional Header Section */}
-      <header className="bg-white px-4 py-3.5 flex justify-center items-center">
+      <header className="bg-white px-4 py-3.5 flex justify-center items-center border-b border-gray-100">
         <div className="flex items-center justify-center gap-2">
           <Image
             src="/assets/kma_logo_blue.png"
@@ -174,27 +179,26 @@ export default function PropertyRadiusVerificationPage() {
 
       {/* Main Framework Content Container Body Workspace */}
       <main className="max-w-md mx-auto w-full px-6 flex flex-col justify-center items-center flex-1 py-4">
-        {/* State A: Loading Verification Layout Status (Matches image_cd5864.png layout spec sheet) */}
+        {/* State A: Loading Verification Layout Status */}
         {isVerifying && (
           <div className="w-full flex flex-col items-center justify-center text-center space-y-8">
-            {/* Vector Graphic Placeholder wrapper */}
-            <div className="relative w-full max-w-[300px] aspect-square flex items-center justify-center bg-[#F3F3FF] rounded-full">
+            <div className="relative w-full max-w-[260px] aspect-square flex items-center justify-center bg-[#F3F3FF] rounded-full shadow-inner">
               <Image
                 src={"/assets/radius_check.png"}
-                height={200}
-                width={200}
+                height={180}
+                width={180}
                 alt="radius check"
+                className="object-contain"
               />
             </div>
 
-            {/* Verifying Location Banner wrapper */}
-            <div className="w-full bg-[#F3F3FF] border border-[#8A73DB]/10 rounded-2xl p-5 max-w-sm">
-              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-[#010048]">
+            <div className="w-full bg-[#F3F3FF] border border-[#8A73DB]/10 rounded-2xl p-5 max-w-sm shadow-sm">
+              <div className="flex items-center justify-center gap-2 text-sm font-bold text-[#010048]">
                 <div className="w-4 h-4 border-2 border-[#010048] border-t-transparent rounded-full animate-spin shrink-0" />
-                <p>Verifying Location</p>
+                <p>Verifying Location... ({countdown}s)</p>
               </div>
               <div className="mt-2.5 bg-[#010048] text-white text-[11px] font-bold py-2 px-6 rounded-lg tracking-wide uppercase inline-block">
-                Estimated required time &lt;5 mins
+                Checking On-Site Geofence
               </div>
             </div>
           </div>
@@ -202,7 +206,7 @@ export default function PropertyRadiusVerificationPage() {
 
         {/* State B: Proximity Passed Success Panel View */}
         {!isVerifying && verificationResult === "success" && (
-          <div className="w-full text-center space-y-6 max-w-sm p-6 bg-green-50 border border-green-100 rounded-3xl">
+          <div className="w-full text-center space-y-6 max-w-sm p-6 bg-green-50 border border-green-200 rounded-3xl shadow-sm animate-in fade-in zoom-in duration-300">
             <div className="w-16 h-16 bg-[#33AB41] text-white rounded-full flex items-center justify-center mx-auto shadow-md">
               <svg
                 className="w-10 h-10"
@@ -219,10 +223,10 @@ export default function PropertyRadiusVerificationPage() {
               </svg>
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-extrabold text-green-900 tracking-tight">
+              <h2 className="text-lg font-black text-green-900 tracking-tight">
                 Proximity Verified
               </h2>
-              <p className="text-xs text-green-700 leading-relaxed font-semibold">
+              <p className="text-xs text-green-700 leading-relaxed font-bold">
                 Verification successful. Your device position matches the
                 property's geofence coordinates (**
                 {computedDistance?.toFixed(1)}m** range).
@@ -233,19 +237,21 @@ export default function PropertyRadiusVerificationPage() {
 
         {/* State C: Verification Out Of Range Breach Banner Fallback */}
         {!isVerifying && verificationResult === "failed" && (
-          <div className="w-full text-center space-y-6 max-w-sm p-6 bg-red-50 border border-red-100 rounded-3xl">
+          <div className="w-full text-center space-y-6 max-w-sm p-6 bg-red-50 border border-red-200 rounded-3xl shadow-sm animate-in fade-in zoom-in duration-300">
             <div className="w-16 h-16 bg-red-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
-              <AlertCircle className="w-9 h-9 stroke-[2]" />
+              <AlertCircle className="w-9 h-9 stroke-[2.5]" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-extrabold text-red-900 tracking-tight">
+              <h2 className="text-lg font-black text-red-900 tracking-tight">
                 Proximity Verification Failed
               </h2>
-              <p className="text-xs text-red-700 leading-relaxed font-semibold px-2">
-                {errorMessage ||
-                  `Location mismatch detected. You are **${((computedDistance || 0) / 1000).toFixed(2)} km** away from the target coordinates.`}
+              <p className="text-xs text-red-700 leading-relaxed font-bold px-2">
+                {computedDistance && computedDistance > 1000 
+                  ? `Location mismatch detected. You are **${(computedDistance / 1000).toFixed(2)} km** away from the target coordinates.`
+                  : `Location mismatch detected. You are **${computedDistance?.toFixed(0)} meters** away from the property.`
+                }
               </p>
-              <p className="text-[11px] text-gray-400 font-medium px-4 pt-1">
+              <p className="text-[11px] text-gray-400 font-semibold px-4 pt-1 leading-normal">
                 On-site validation requires your device to be within the
                 mandatory **500m** operational boundary.
               </p>
@@ -254,9 +260,9 @@ export default function PropertyRadiusVerificationPage() {
             <button
               type="button"
               onClick={runRadiusVerificationCheck}
-              className="mt-2 inline-flex items-center justify-center gap-1.5 bg-[#010048] text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-sm hover:bg-opacity-95 cursor-pointer active:scale-95 transition-all"
+              className="mt-2 inline-flex items-center justify-center gap-1.5 bg-[#010048] text-white text-xs font-bold px-6 py-3 rounded-full shadow-md hover:bg-opacity-95 cursor-pointer active:scale-95 transition-all"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Re-scan
+              <RefreshCw className="w-3.5 h-3.5" /> Re-scan Location
             </button>
           </div>
         )}
