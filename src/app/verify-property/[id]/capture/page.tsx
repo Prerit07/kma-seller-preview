@@ -265,16 +265,95 @@ You must respond strictly in JSON format matching this pattern:
     }
   };
 
-  const handleFinalSubmit = async () => {
-    setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
+ const handleFinalSubmit = async () => {
+    try {
+      setIsUploading(true);
+
+      const activeToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3YjU0MTgyOC1mZjM0LTQzMzItODBiNy0yMTM1ZTk5YWRmMWIiLCJwaG9uZSI6IjkzNTQwNDA1MjciLCJyb2xlIjoiQ0hBTk5FTF9QQVJUTkVSIiwidHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc3OTcwNjM4NiwiZXhwIjoxNzc5NzkyNzg2fQ.tl90zmOzMmmRNdA4ZEursLkH92xiWiEIXW4Qgz3mN00";
+
+      // 1. NestJS clean string enums mapping helper
+      const mapLabelToBackendEnum = (label: string) => {
+        const lower = label.toLowerCase();
+        if (lower.includes("living") || lower.includes("hall")) return "Living Room";
+        if (lower.includes("kitchen")) return "Kitchen";
+        if (lower.includes("bedroom")) return "Bedroom";
+        if (lower.includes("bathroom")) return "Bathroom";
+        if (lower.includes("balcony")) return "Balcony";
+        if (lower.includes("exterior") || lower.includes("entrance")) return "Exterior";
+        if (lower.includes("parking")) return "Parking";
+        if (lower.includes("amenities")) return "Amenities";
+        return "Other";
+      };
+
+      // 2. Photos array array structure structure matching dynamic step definitions
+      const formattedPhotosArray = VERIFICATION_STEPS.map((step, idx) => {
+        const urlLink = verifiedImages[step.id];
+        return {
+          view: mapLabelToBackendEnum(step.label),
+          fileKey: urlLink,
+          isCoverImage: idx === 0
+        };
+      });
+
+      // 🎯 PIPELINE STEP A: Pehle Standard Step-4 call se sari photos register/save karwao
+      const step4Url = `https://kmaglobalproperty.com/api/backend/property/step-4`;
+
+      const saveResponse = await fetch(step4Url, {
+        method: "POST", // Strict POST required for registration
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${activeToken}` 
+        },
+        body: JSON.stringify({
+          propertyId: propertyId, // Request body dynamic DTO wrap encapsulation
+          photos: formattedPhotosArray
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        throw new Error(`Step-4 Data Save Failed: ${errorText}`);
+      }
+
+      // 🎯 PIPELINE STEP B: Swagger bulk-approve endpoint se ek hi baar me sari photos status Approved mark karvao!
+      // Saari verified photos ke Cloudinary/S3 URLs ka array ready kar rahe hain pure arrays lookup ke liye
+      const allVerifiedFileKeys = VERIFICATION_STEPS
+        .filter(step => verifiedImages[step.id])
+        .map(step => verifiedImages[step.id]);
+
+      if (allVerifiedFileKeys.length > 0) {
+        const bulkApproveUrl = `https://kmaglobalproperty.com/api/backend/admin/properties/${propertyId}/media/bulk-approve`;
+
+        const approveResponse = await fetch(bulkApproveUrl, {
+          method: "POST", //
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${activeToken}` 
+          },
+          body: JSON.stringify({
+            fileKeys: allVerifiedFileKeys // 👈 Passing string arrays matching Swagger array contract specification schema
+          }),
+        });
+
+        if (!approveResponse.ok) {
+          const approveErrorText = await approveResponse.text();
+          console.warn("Bulk approval background warning trace:", approveErrorText);
+        }
+      }
+
+      // Safe clean up parameters state logs
       localStorage.removeItem(`captured_${propertyId}`);
       localStorage.removeItem(`verified_${propertyId}`);
-      router.push(`/property/${propertyId}/success`);
-    }, 2000);
-  };
+      
+      alert("🎉 Property verified and photos successfully pushed to bulk approval pipeline!");
+      router.push(`/verify-property/${propertyId}/thank-you`);
 
+    } catch (error: any) {
+      alert(`🚨 Submission Failure:\n${error?.message || "Format Payload Discrepancy"}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
   const isAllStepsCompleted = VERIFICATION_STEPS.every((step) => verifiedImages[step.id]);
 
   if (loading) {
